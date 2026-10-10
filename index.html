@@ -1,0 +1,721 @@
+<title>Top 5 Board</title>
+<meta name="description" content="A bento board of ranked top-five lists.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=Bricolage+Grotesque:opsz,wght@12..96,400..700&family=Martian+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a full-bleed riso-printed bento board. Each genre is an ink plate with its own silhouette
+   and a motif from its world; the masthead is bare type on paper. Breakpoints follow the board's
+   container width, not the viewport. */
+:root {
+  --paper: #EFF1EC;
+  --ink: #1C1B26;
+  --on-dark: #F7F6F0;
+  --on-light: #1C1B26;
+  --riso-blue: #3D5588;
+  --riso-orange: #FF6C2F;
+  --riso-purple: #765BA7;
+  --riso-yellow: #FFE800;
+  --riso-pink: #FF48B0;
+  --riso-teal: #00787E;
+  --riso-green: #00A95C;
+  --riso-red: #F15060;
+  --font-display: "Bagel Fat One", "Arial Black", system-ui, sans-serif;
+  --font-body: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Martian Mono", ui-monospace, Menlo, monospace;
+  --gap: clamp(8px, 1vw, 14px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --paper: #15141B; --ink: #EDEBF3; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --paper: #15141B; --ink: #EDEBF3; color-scheme: dark; }
+
+html, body { height: 100%; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--font-body);
+  padding-inline: 16px; padding-block: 16px; box-sizing: border-box;
+}
+
+t5-board { display: block; container: board / inline-size; block-size: 100%; }
+
+.board-grid {
+  display: grid; gap: var(--gap); block-size: 100%; min-block-size: 600px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+  grid-template-areas:
+    "mast mast mast mast soul soul soul soul soul taco taco taco"
+    "mast mast mast mast soul soul soul soul soul taco taco taco"
+    "mast mast mast mast scif scif hiph hiph hiph taco taco taco"
+    "type type type type scif scif hiph hiph hiph taco taco taco"
+    "type type type type road road road road snkr snkr game game"
+    "type type type type road road road road snkr snkr game game";
+}
+
+t5-masthead { grid-area: mast; }
+t5-tile[area="soul"] { grid-area: soul; --order: 1; }
+t5-tile[area="taco"] { grid-area: taco; --order: 2; }
+t5-tile[area="scif"] { grid-area: scif; --order: 3; }
+t5-tile[area="hiph"] { grid-area: hiph; --order: 4; }
+t5-tile[area="type"] { grid-area: type; --order: 5; }
+t5-tile[area="road"] { grid-area: road; --order: 6; }
+t5-tile[area="snkr"] { grid-area: snkr; --order: 7; }
+t5-tile[area="game"] { grid-area: game; --order: 8; }
+
+@container board (max-width: 959px) {
+  .board-grid {
+    block-size: auto; min-block-size: 0;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-rows: none; grid-auto-rows: 176px;
+    grid-template-areas:
+      "mast mast mast soul soul soul"
+      "mast mast mast soul soul soul"
+      "taco taco scif scif hiph hiph"
+      "taco taco type type type type"
+      "road road road road snkr snkr"
+      "game game game game snkr snkr";
+  }
+}
+
+@container board (max-width: 599px) {
+  .board-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 168px;
+    grid-template-areas:
+      "mast mast"
+      "mast mast"
+      "soul soul"
+      "taco scif"
+      "taco hiph"
+      "type type"
+      "road road"
+      "snkr game";
+  }
+}
+
+/* Fallback for engines without container queries. */
+@supports not (container-type: inline-size) {
+  @media (max-width: 991px) {
+    .board-grid { block-size: auto; grid-template-columns: 1fr 1fr; grid-template-rows: none;
+      grid-auto-rows: 176px; grid-template-areas: "mast mast" "mast mast" "soul soul" "taco scif"
+      "taco hiph" "type type" "road road" "snkr game"; }
+  }
+}
+
+</style>
+<t5-board></t5-board>
+<script type="module">
+// ---- dom.ts
+/** Build a constructable stylesheet for a shadow root. */
+function css(text) {
+    const s = new CSSStyleSheet();
+    s.replaceSync(text);
+    return s;
+}
+/** createElement with attributes and text. Text always goes through textContent. */
+function el(tag, attrs = {}, text) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs))
+        node.setAttribute(k, v);
+    if (text !== undefined)
+        node.textContent = text;
+    return node;
+}
+/** Clone a static, trusted template string into a fragment. Never pass data through this. */
+function fragment(markup) {
+    const t = document.createElement('template');
+    t.innerHTML = markup;
+    return t.content;
+}
+function reducedMotion() {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+function centerOf(node) {
+    const r = node.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+
+// ---- data.ts
+/** Placeholder rankings. Swap for real data; the shape is the contract. */
+const GENRES = [
+    {
+        id: 'soul-singers', title: 'Soul Singers', category: 'Music', ink: 'blue', motif: 'halftone', area: 'soul',
+        picks: [
+            { name: 'Aretha Franklin', note: 'Queen. Not up for debate.' },
+            { name: 'Otis Redding', note: 'Try a Little Tenderness, every time.' },
+            { name: 'Sam Cooke', note: 'The template everyone traced.' },
+            { name: 'Marvin Gaye', note: "What's Going On still asks the question." },
+            { name: 'Nina Simone', note: 'Refuses every category, including this one.' },
+        ],
+    },
+    {
+        id: 'tacos', title: 'Tacos', category: 'Food', ink: 'orange', motif: 'zigzag', area: 'taco',
+        picks: [
+            { name: 'Al pastor', note: 'Off the trompo, with a sliver of pineapple.' },
+            { name: 'Birria', note: 'Dunk it. Consommé is mandatory.' },
+            { name: 'Carnitas', note: 'Crispy edges or nothing.' },
+            { name: 'Baja fish', note: 'Beer batter, cabbage, crema.' },
+            { name: 'Carne asada', note: 'Simple, charred, reliable.' },
+        ],
+    },
+    {
+        id: 'sci-fi-films', title: 'Sci‑Fi Films', category: 'Film', ink: 'purple', motif: 'stars', area: 'scif',
+        picks: [
+            { name: 'Blade Runner', note: 'The rain, the neon, the tears.' },
+            { name: 'Arrival', note: 'A first-contact film about grief.' },
+            { name: 'Alien', note: 'A haunted house with a cargo manifest.' },
+            { name: '2001: A Space Odyssey', note: 'Still ahead of us.' },
+            { name: 'Children of Men', note: 'That one long take.' },
+        ],
+    },
+    {
+        id: 'hip-hop-albums', title: 'Hip‑Hop Albums', category: 'Music', ink: 'yellow', motif: 'record', area: 'hiph',
+        picks: [
+            { name: 'Illmatic', note: 'Ten tracks, no skips.' },
+            { name: 'The Low End Theory', note: 'Jazz bass, perfect pocket.' },
+            { name: 'Madvillainy', note: 'Two-minute masterpieces.' },
+            { name: 'Aquemini', note: 'Atlanta, fully formed.' },
+            { name: 'Ready to Die', note: 'Storytelling at its peak.' },
+        ],
+    },
+    {
+        id: 'typefaces', title: 'Typefaces', category: 'Design', ink: 'pink', motif: 'glyph', area: 'type',
+        picks: [
+            { name: 'Futura', note: 'Went to the moon. Literally.' },
+            { name: 'Akzidenz‑Grotesk', note: 'Helvetica before Helvetica.' },
+            { name: 'Garamond', note: 'Five centuries and counting.' },
+            { name: 'Cooper Black', note: 'Warm, round, a little goofy.' },
+            { name: 'Gill Sans', note: 'The London Underground in a font.' },
+        ],
+    },
+    {
+        id: 'road-trip-songs', title: 'Road Trip Songs', category: 'Music', ink: 'teal', motif: 'lanes', area: 'road',
+        picks: [
+            { name: 'Fast Car', note: 'Tracy Chapman, windows down.' },
+            { name: 'Born to Run', note: 'Built for highway on-ramps.' },
+            { name: 'Running Down a Dream', note: 'The guitar outro does the driving.' },
+            { name: 'Go Your Own Way', note: 'Every passenger sings this one.' },
+            { name: 'Ramble On', note: 'Good for mile 300.' },
+        ],
+    },
+    {
+        id: 'sneakers', title: 'Sneakers', category: 'Style', ink: 'green', motif: 'scallop', area: 'snkr',
+        picks: [
+            { name: 'Air Jordan 1', note: 'Chicago colorway.' },
+            { name: 'Adidas Samba', note: 'Gum sole, forever.' },
+            { name: 'Nike Air Max 1', note: 'The visible air bubble that started it.' },
+            { name: 'New Balance 990', note: 'Grey suede, dad approved.' },
+            { name: 'Converse Chuck 70', note: 'Goes with everything.' },
+        ],
+    },
+    {
+        id: 'board-games', title: 'Board Games', category: 'Games', ink: 'red', motif: 'checker', area: 'game',
+        picks: [
+            { name: 'Wingspan', note: 'Birds, engines, quiet joy.' },
+            { name: 'Codenames', note: 'Best with a loud table.' },
+            { name: 'Catan', note: 'Wood for sheep, anyone?' },
+            { name: 'Ticket to Ride', note: 'The gateway game.' },
+            { name: 'Azul', note: 'Pretty tiles, sharp elbows.' },
+        ],
+    },
+];
+
+// ---- ink.styles.ts
+/**
+ * Shared plate styles for tiles and the detail sheet.
+ * [data-ink] sets the plate colors; [data-motif] sets the overprint pattern and plate silhouette.
+ * Fg/overprint pairs are picked so text holds AA against the plate.
+ */
+const inkCss = /* css */ `
+[data-ink] { --pad: clamp(14px, 6cqmin, 30px); }
+[data-ink="blue"]   { --bg: var(--riso-blue);   --fg: var(--on-dark);  --ink2: var(--riso-pink); }
+[data-ink="orange"] { --bg: var(--riso-orange); --fg: var(--on-light); --ink2: var(--riso-purple); }
+[data-ink="purple"] { --bg: var(--riso-purple); --fg: var(--on-dark);  --ink2: var(--riso-yellow); }
+[data-ink="yellow"] { --bg: var(--riso-yellow); --fg: var(--on-light); --ink2: var(--riso-blue); }
+[data-ink="pink"]   { --bg: var(--riso-pink);   --fg: var(--on-light); --ink2: var(--riso-yellow); }
+[data-ink="teal"]   { --bg: var(--riso-teal);   --fg: var(--on-dark);  --ink2: var(--riso-yellow); }
+[data-ink="green"]  { --bg: var(--riso-green);  --fg: var(--on-light); --ink2: var(--riso-pink); }
+[data-ink="red"]    { --bg: var(--riso-red);    --fg: var(--on-light); --ink2: var(--riso-yellow); }
+
+[data-motif="halftone"] { --shape: 28px 34cqmin 28px 28px; }
+[data-motif="zigzag"]   { --shape: 999px 999px 28px 28px; }
+[data-motif="stars"]    { --shape: 28px; }
+[data-motif="record"]   { --shape: 28px 46cqmin 28px 28px; }
+[data-motif="glyph"]    { --shape: 6px; }
+[data-motif="lanes"]    { --shape: 999px; }
+[data-motif="scallop"]  { --shape: 64px 28px 28px 28px; }
+[data-motif="checker"]  { --shape: 0; }
+
+/* corner-shape plates (Chromium 139+). Other engines keep the rounded silhouettes above. */
+@supports (corner-shape: squircle) {
+  [data-motif="stars"]   { --shape: 28px 22cqmin 28px 28px; --corner: round bevel round round; }
+  [data-motif="glyph"]   { --shape: 26px; --corner: scoop; --pad: clamp(30px, 6cqmin, 36px); }
+  [data-motif="scallop"] { --shape: 72px 44px 44px 44px; --corner: squircle; }
+  [data-motif="checker"] { --shape: 20px; --corner: notch; --pad: clamp(28px, 7cqmin, 34px); }
+  [data-motif="halftone"] { --shape: 40px 34cqmin 40px 40px; --corner: squircle round squircle squircle; }
+}
+
+.motif-box { position: absolute; inset: 0; z-index: -1; pointer-events: none; container-type: size; }
+.motif {
+  position: absolute; inset: 0;
+  transition: transform .5s cubic-bezier(.3, 1.5, .5, 1), background-position 1.2s linear;
+}
+[data-motif="halftone"] .motif {
+  background:
+    radial-gradient(circle at 84% 24%, var(--ink2) 0 16cqmin, transparent calc(16cqmin + 1px)),
+    radial-gradient(circle, var(--ink2) 0 34%, transparent 36%) 0 0 / 12px 12px;
+  mask-image: radial-gradient(circle at 84% 24%, #000 0 22cqmin, transparent 58cqmin);
+}
+[data-motif="zigzag"] .motif {
+  background:
+    linear-gradient(135deg, var(--ink2) 25%, transparent 25%) -14px 0 / 28px 28px,
+    linear-gradient(225deg, var(--ink2) 25%, transparent 25%) -14px 0 / 28px 28px;
+  mask-image: linear-gradient(to bottom, #000 0 18%, transparent 34%);
+}
+[data-motif="stars"] .motif {
+  background:
+    radial-gradient(circle at 80% 26%, var(--ink2) 0 12cqmin, transparent calc(12cqmin + 1px)),
+    radial-gradient(ellipse 26cqmin 5cqmin at 80% 26%, transparent 0 72%, var(--ink2) 74% 88%, transparent 90%),
+    radial-gradient(circle, var(--ink2) 0 1.4px, transparent 2px) 0 0 / 23px 29px,
+    radial-gradient(circle, var(--ink2) 0 1px, transparent 1.6px) 11px 7px / 17px 13px;
+  mask-image: linear-gradient(200deg, #000 0 40%, transparent 75%);
+}
+[data-motif="record"] .motif {
+  background:
+    radial-gradient(circle at 100% 0, var(--ink2) 0 10cqmin, transparent calc(10cqmin + 1px)),
+    repeating-radial-gradient(circle at 100% 0, var(--ink2) 0 1.5px, transparent 2px 7px);
+  mask-image: radial-gradient(circle at 100% 0, #000 0 56cqmin, transparent calc(56cqmin + 1px));
+}
+[data-motif="glyph"] .motif::after {
+  content: "Ag"; position: absolute; inset-inline-end: -.02em; inset-block-end: -.3em;
+  font: italic 700 96cqh/1 Georgia, "Times New Roman", serif; color: var(--ink2);
+}
+[data-motif="lanes"] .motif {
+  background:
+    linear-gradient(var(--ink2), var(--ink2)) 0 14% / 100% 3px no-repeat,
+    repeating-linear-gradient(90deg, var(--ink2) 0 30px, transparent 30px 52px) 0 28% / 100% 7px no-repeat,
+    linear-gradient(var(--ink2), var(--ink2)) 0 42% / 100% 3px no-repeat;
+  mask-image: linear-gradient(to left, #000 0 45%, transparent 85%);
+}
+[data-motif="scallop"] .motif {
+  background:
+    radial-gradient(circle at 0 50%, transparent 0 9px, var(--ink2) 10px) 100% 0 / 26px 20px repeat-y,
+    radial-gradient(circle, var(--ink2) 0 2.5px, transparent 3px) calc(100% - 34px) 5px / 14px 14px repeat-y;
+  mask-image: linear-gradient(to left, #000 0 50px, transparent 52px);
+}
+[data-motif="checker"] .motif {
+  background: conic-gradient(var(--ink2) 25%, transparent 0 50%, var(--ink2) 0 75%, transparent 0) 0 0 / 30px 30px;
+  mask-image: linear-gradient(225deg, #000 0 20%, transparent 44%);
+}
+`;
+
+// ---- t5-tile.ts
+const tileStyles = css(/* css */ `
+${inkCss}
+:host { display: block; container: tile / size; min-inline-size: 0; min-block-size: 0; }
+.tile {
+  position: relative; isolation: isolate; overflow: hidden; box-sizing: border-box;
+  inline-size: 100%; block-size: 100%; padding: var(--pad);
+  display: grid; grid-template-rows: auto 1fr auto; gap: .4rem;
+  background: var(--bg); color: var(--fg); border-radius: var(--shape); corner-shape: var(--corner, round);
+  font-family: var(--font-body);
+  transition: transform .4s cubic-bezier(.3, 1.6, .5, 1), box-shadow .4s cubic-bezier(.3, 1.6, .5, 1);
+  animation: settle .7s cubic-bezier(.3, 1.6, .5, 1) both;
+  animation-delay: calc(var(--order, 0) * 55ms);
+}
+[data-motif="zigzag"].tile  { padding-block-start: max(var(--pad), 34cqi); }
+[data-motif="lanes"].tile   { padding-inline: max(var(--pad), 26cqh); }
+[data-motif="scallop"].tile { padding-inline-end: max(var(--pad), 58px); }
+[data-motif="scallop"] button { font-size: clamp(1.1rem, min(10.5cqi, 24cqh), 5.6rem); }
+.tile:hover { transform: translate(-4px, -4px) rotate(-.4deg); box-shadow: 8px 8px 0 var(--ink); }
+.tile:active { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--ink); }
+.tile:has(button:focus-visible) { outline: 3px solid var(--ink); outline-offset: 4px; }
+.tile:hover .motif { transform: translate(6px, -5px); }
+[data-motif="lanes"].tile:hover .motif { background-position: 0 14%, -104px 28%, 0 42%; transform: none; }
+
+.meta { display: flex; justify-content: start; align-items: center; gap: .5rem; }
+.cat {
+  font: 500 .66rem/1 var(--font-mono); letter-spacing: .1em; text-transform: uppercase;
+  padding: .38em .7em; border: 1.5px solid currentColor; border-radius: 999px;
+}
+
+h2 { margin: 0; align-self: end; }
+button {
+  all: unset; cursor: pointer; display: block;
+  font-family: var(--font-display); font-weight: 400; line-height: .92;
+  font-size: clamp(1.1rem, min(12cqi, 24cqh), 5.6rem);
+  text-wrap: balance; hyphens: auto;
+  text-shadow: 0 0 0 var(--ink2);
+  transition: text-shadow .3s cubic-bezier(.3, 1.6, .5, 1);
+}
+button::after { content: ""; position: absolute; inset: 0; z-index: 1; }
+.tile:hover button, button:focus-visible { text-shadow: .06em .05em 0 var(--ink2); }
+.tile[data-ink="pink"]:hover button { text-shadow: .06em .05em 0 var(--on-dark); }
+
+ol { list-style: none; margin: 0; padding: 0; display: grid; gap: .22rem;
+  font-size: clamp(.78rem, 4cqi, 1rem); font-weight: 600; }
+li { display: grid; grid-template-columns: 2.4ch 1fr; align-items: baseline; }
+li:nth-child(n + 2) { display: none; }
+.rank { font: 500 .78em/1 var(--font-mono); }
+li:first-child { font-size: 1.12em; }
+@container tile (min-height: 330px) and (min-width: 230px) {
+  li:nth-child(n + 2) { display: grid; }
+  li:first-child { padding-block-end: .25rem; margin-block-end: .2rem; border-block-end: 1.5px dashed currentColor; }
+}
+@container tile (max-height: 150px) { .cat { display: none; } }
+@keyframes settle { from { transform: translateY(14px) scale(.97) rotate(.6deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .tile, .motif, button { animation: none; transition: none; }
+}
+`);
+const tileMarkup = /* html */ `
+<article class="tile" lang="en">
+  <div class="motif-box" aria-hidden="true"><div class="motif"></div></div>
+  <header class="meta">
+    <span class="cat"></span>
+  </header>
+  <h2><button type="button" aria-haspopup="dialog"></button></h2>
+  <ol role="list"></ol>
+</article>`;
+/** One genre plate on the board. Dispatches `t5-open` when activated. */
+class T5Tile extends HTMLElement {
+    #genre = null;
+    #root;
+    constructor() {
+        super();
+        this.#root = this.attachShadow({ mode: 'open' });
+        this.#root.adoptedStyleSheets = [tileStyles];
+        this.#root.append(fragment(tileMarkup));
+        this.#button.addEventListener('click', () => this.#open());
+    }
+    get genre() { return this.#genre; }
+    set genre(value) {
+        this.#genre = value;
+        this.#render();
+    }
+    focus(options) { this.#button.focus(options); }
+    get #button() {
+        return this.#root.querySelector('button');
+    }
+    #open() {
+        if (!this.#genre)
+            return;
+        this.dispatchEvent(new CustomEvent('t5-open', {
+            bubbles: true, composed: true,
+            detail: { id: this.#genre.id, origin: centerOf(this) },
+        }));
+    }
+    #render() {
+        const g = this.#genre;
+        if (!g)
+            return;
+        const article = this.#root.querySelector('article');
+        article.dataset['ink'] = g.ink;
+        article.dataset['motif'] = g.motif;
+        this.setAttribute('area', g.area);
+        this.#root.querySelector('.cat').textContent = g.category;
+        this.#button.textContent = g.title;
+        this.#button.setAttribute('aria-label', `Top 5 ${g.title}. Number one: ${g.picks[0].name}`);
+        const list = this.#root.querySelector('ol');
+        list.replaceChildren(...g.picks.map((p, i) => {
+            const li = el('li');
+            li.append(el('span', { class: 'rank', 'aria-hidden': 'true' }, String(i + 1)), el('span', {}, p.name));
+            return li;
+        }));
+    }
+}
+customElements.define('t5-tile', T5Tile);
+
+// ---- t5-masthead.ts
+const mastStyles = css(/* css */ `
+:host { display: block; container: mast / size; min-inline-size: 0; min-block-size: 0; }
+header {
+  box-sizing: border-box; block-size: 100%; padding: clamp(10px, 3cqmin, 20px) clamp(4px, 2cqi, 16px);
+  display: grid; grid-template-rows: auto 1fr auto; gap: .5rem; color: var(--ink);
+  font-family: var(--font-body);
+}
+.kicker { margin: 0; font: 500 .68rem/1.3 var(--font-mono); letter-spacing: .12em; text-transform: uppercase;
+  display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+h1 { margin: 0; display: flex; align-items: center; justify-content: center; gap: 2cqi; min-block-size: 0;
+  font-family: var(--font-display); font-weight: 400; line-height: .78; }
+.top { writing-mode: vertical-rl; transform: rotate(180deg); font-size: clamp(1.6rem, min(15cqi, 17cqh), 6rem);
+  letter-spacing: .02em; color: var(--ink); }
+.five { position: relative; isolation: isolate; font-size: clamp(6rem, min(74cqh, 72cqi), 30rem); color: var(--riso-pink);
+  animation: wobble 6s ease-in-out infinite; }
+.five::before { content: "5"; position: absolute; inset: 0; z-index: -1; color: var(--riso-blue);
+  transform: translate(.04em, .03em); }
+.foot { display: flex; align-items: end; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
+.blurb { margin: 0; max-inline-size: 26ch; font-size: clamp(.86rem, 3.4cqi, 1.05rem); line-height: 1.35; text-wrap: pretty; }
+button {
+  all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: .5rem;
+  font: 600 .9rem/1 var(--font-body); padding: .7rem 1rem .7rem .8rem; border-radius: 999px;
+  background: var(--ink); color: var(--paper); transition: transform .3s cubic-bezier(.3, 1.6, .5, 1);
+}
+button:hover { transform: rotate(-3deg) scale(1.04); }
+button:focus-visible { outline: 3px solid var(--riso-pink); outline-offset: 3px; }
+svg { inline-size: 1.25rem; block-size: 1.25rem; }
+button.rolling svg { animation: roll .6s cubic-bezier(.3, 1.4, .5, 1); }
+@container mast (max-height: 300px) { .blurb { display: none; } }
+@keyframes wobble { 50% { transform: rotate(-2.5deg) translateY(-1.5%); } }
+@keyframes roll { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .five, button.rolling svg { animation: none; } button { transition: none; } }
+`);
+const mastMarkup = /* html */ `
+<header>
+  <p class="kicker"><span>Vol. 01</span><span>Ranked, then re‑ranked</span></p>
+  <h1><span class="top">Top</span><span class="five">5</span></h1>
+  <div class="foot">
+    <p class="blurb">Eight obsessions, five picks each. Tap any tile for the full ranking.</p>
+    <button type="button" aria-haspopup="dialog">
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+        <rect x="3.5" y="3.5" width="17" height="17" rx="4"/>
+        <circle cx="8.5" cy="8.5" r="1.3" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.3" fill="currentColor"/>
+        <circle cx="12" cy="12" r="1.3" fill="currentColor"/>
+      </svg>
+      Surprise me
+    </button>
+  </div>
+</header>`;
+/** Board title plate. Dispatches `t5-random` from its dice button. */
+class T5Masthead extends HTMLElement {
+    constructor() {
+        super();
+        const root = this.attachShadow({ mode: 'open' });
+        root.adoptedStyleSheets = [mastStyles];
+        root.append(fragment(mastMarkup));
+        const dice = root.querySelector('button');
+        dice.addEventListener('click', () => {
+            dice.classList.remove('rolling');
+            void dice.offsetWidth;
+            dice.classList.add('rolling');
+            this.dispatchEvent(new CustomEvent('t5-random', {
+                bubbles: true, composed: true, detail: { origin: centerOf(dice) },
+            }));
+        });
+    }
+}
+customElements.define('t5-masthead', T5Masthead);
+
+// ---- t5-sheet.ts
+const sheetStyles = css(/* css */ `
+${inkCss}
+dialog {
+  padding: 0; border: 0; background: transparent; color: inherit; overflow: visible;
+  inline-size: min(720px, 100% - 32px); max-inline-size: none; max-block-size: calc(100% - 32px);
+}
+dialog::backdrop {
+  background:
+    radial-gradient(circle, rgb(0 0 0 / .35) 0 1px, transparent 1.5px) 0 0 / 7px 7px,
+    rgb(20 19 26 / .55);
+}
+.sheet {
+  container: sheet / inline-size; position: relative; isolation: isolate; overflow: hidden auto;
+  box-sizing: border-box; max-block-size: calc(100dvh - 32px); padding: var(--pad);
+  background: var(--bg); color: var(--fg); border-radius: var(--shape); corner-shape: var(--corner, round);
+  font-family: var(--font-body); display: grid; gap: 1.25rem;
+}
+[data-motif="zigzag"].sheet { --shape: 160px 160px 28px 28px; padding-block-start: max(var(--pad), 90px); }
+[data-motif="lanes"].sheet, [data-motif="halftone"].sheet { --shape: 28px 120px 28px 28px; }
+[data-motif="scallop"].sheet { padding-inline-end: max(var(--pad), 86px); }
+.motif-box { inset: 0 0 auto auto; inline-size: min(48%, 340px); block-size: 240px; }
+[data-motif="zigzag"] .motif-box, [data-motif="lanes"] .motif-box { inline-size: 100%; block-size: 180px; }
+[data-motif="scallop"] .motif-box { inline-size: 90px; block-size: 100%; }
+[data-motif="lanes"] .motif-box { block-size: 120px; }
+header { display: grid; grid-template-columns: 1fr auto; gap: .5rem 1rem; align-items: start; }
+.cat { margin: 0; font: 500 .7rem/1 var(--font-mono); letter-spacing: .12em; text-transform: uppercase; }
+h2 { grid-column: 1; margin: 0; font: 400 clamp(2.2rem, 9cqi, 4.4rem)/.92 var(--font-display); text-wrap: balance; }
+h2 small { display: block; font-size: .42em; letter-spacing: .02em; margin-block-end: .2em; }
+.close { grid-column: 2; grid-row: 1 / span 2; }
+ol { list-style: none; margin: 0; padding: 0; display: grid; }
+li { display: grid; grid-template-columns: 2.2ch 1fr; gap: .9rem; align-items: center;
+  padding-block: .7rem; border-block-start: 2px dashed currentColor; }
+li:first-child { border: 0; }
+.num { font: 400 2.6rem/1 var(--font-display); text-align: center; }
+li:first-child .num { font-size: 4.4rem; }
+li:first-child .name { font-size: 1.6rem; }
+.name { margin: 0; font-size: 1.15rem; font-weight: 700; line-height: 1.15; }
+.note { margin: .2rem 0 0; font-size: .95rem; line-height: 1.4; }
+footer { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap;
+  font: 500 .72rem/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+footer output { font-variant-numeric: tabular-nums; }
+button {
+  all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: .45rem;
+  padding: .6rem .9rem; border: 2px solid currentColor; border-radius: 999px;
+  font: 600 .85rem/1 var(--font-body); letter-spacing: 0; text-transform: none;
+  transition: background .2s, color .2s;
+}
+button:hover { background: var(--fg); color: var(--bg); }
+button:focus-visible { outline: 3px solid var(--fg); outline-offset: 3px; }
+.close { padding: .55rem; background: var(--bg); }
+svg { inline-size: 1.1rem; block-size: 1.1rem; }
+@container sheet (max-width: 440px) { .label { display: none; } }
+`);
+const sheetMarkup = /* html */ `
+<dialog aria-labelledby="sheet-title">
+  <article class="sheet">
+    <div class="motif-box" aria-hidden="true"><div class="motif"></div></div>
+    <header>
+      <p class="cat"></p>
+      <h2 id="sheet-title"><small>Top 5</small><span class="title"></span></h2>
+      <button type="button" class="close" aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </header>
+    <ol role="list"></ol>
+    <footer>
+      <button type="button" data-dir="-1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg><span class="label"></span></button>
+      <output aria-live="polite"></output>
+      <button type="button" data-dir="1"><span class="label"></span><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></button>
+    </footer>
+  </article>
+</dialog>`;
+/** Modal detail view for one genre. Dispatches `t5-step` for prev/next and arrow keys. */
+class T5Sheet extends HTMLElement {
+    #root;
+    #dialog;
+    #article;
+    constructor() {
+        super();
+        this.#root = this.attachShadow({ mode: 'open' });
+        this.#root.adoptedStyleSheets = [sheetStyles];
+        this.#root.append(fragment(sheetMarkup));
+        this.#dialog = this.#root.querySelector('dialog');
+        this.#article = this.#root.querySelector('article');
+        this.#root.querySelector('.close')?.addEventListener('click', () => this.close());
+        this.#dialog.addEventListener('click', (e) => { if (e.target === this.#dialog)
+            this.close(); });
+        this.#dialog.addEventListener('close', () => this.dispatchEvent(new Event('close')));
+        this.#dialog.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft')
+                this.#step(-1);
+            if (e.key === 'ArrowRight')
+                this.#step(1);
+        });
+        for (const b of this.#root.querySelectorAll('footer button')) {
+            b.addEventListener('click', () => this.#step(b.dataset['dir'] === '-1' ? -1 : 1));
+        }
+    }
+    get isOpen() { return this.#dialog.open; }
+    show(genre, pos, origin) {
+        this.#render(genre, pos);
+        if (!this.#dialog.open)
+            this.#dialog.showModal();
+        this.#reveal(origin);
+    }
+    close() { this.#dialog.close(); }
+    #step(dir) {
+        this.dispatchEvent(new CustomEvent('t5-step', { detail: { dir } }));
+    }
+    #reveal(origin) {
+        if (reducedMotion())
+            return;
+        const r = this.#article.getBoundingClientRect();
+        const at = `at ${origin.x - r.left}px ${origin.y - r.top}px`;
+        this.#article.animate([{ clipPath: `circle(0 ${at})` }, { clipPath: `circle(150% ${at})` }], { duration: 520, easing: 'cubic-bezier(.2, .9, .2, 1)' });
+    }
+    #render(g, pos) {
+        const a = this.#article;
+        a.dataset['ink'] = g.ink;
+        a.dataset['motif'] = g.motif;
+        a.scrollTop = 0;
+        a.querySelector('.cat').textContent = g.category;
+        a.querySelector('.title').textContent = g.title;
+        a.querySelector('ol').replaceChildren(...g.picks.map((p, i) => {
+            const body = el('div');
+            body.append(el('p', { class: 'name' }, p.name), el('p', { class: 'note' }, p.note));
+            const li = el('li');
+            li.append(el('span', { class: 'num', 'aria-hidden': 'true' }, String(i + 1)), body);
+            return li;
+        }));
+        const [prevBtn, nextBtn] = a.querySelectorAll('footer button');
+        this.#label(prevBtn, `Previous: ${pos.prev.title}`, pos.prev.title);
+        this.#label(nextBtn, `Next: ${pos.next.title}`, pos.next.title);
+        a.querySelector('output').textContent = `${pos.index + 1} / ${pos.total}`;
+    }
+    #label(btn, aria, text) {
+        if (!btn)
+            return;
+        btn.setAttribute('aria-label', aria);
+        btn.querySelector('.label').textContent = text;
+    }
+}
+customElements.define('t5-sheet', T5Sheet);
+
+// ---- t5-board.ts
+/**
+ * Page shell. Light DOM so page.css owns the bento grid and its container-query layouts.
+ * Owns the only piece of state: which genre the sheet shows.
+ */
+class T5Board extends HTMLElement {
+    #genres = [];
+    #active = -1;
+    #returnFocus = null;
+    #grid = el('main', { class: 'board-grid', 'aria-label': 'Top 5 genres' });
+    #sheet = document.createElement('t5-sheet');
+    constructor() {
+        super();
+        this.addEventListener('t5-open', (e) => this.#open(this.#indexOf(e.detail.id), e.detail.origin));
+        this.addEventListener('t5-random', (e) => this.#open(this.#randomIndex(), e.detail.origin, false));
+        this.#sheet.addEventListener('t5-step', (e) => this.#step(e.detail.dir));
+        this.#sheet.addEventListener('close', () => {
+            this.#returnFocus?.focus();
+            this.#active = -1;
+        });
+    }
+    set genres(value) {
+        this.#genres = value;
+        this.#render();
+    }
+    connectedCallback() {
+        if (!this.#grid.isConnected)
+            this.append(this.#grid, this.#sheet);
+    }
+    #render() {
+        const tiles = this.#genres.map((g) => {
+            const tile = document.createElement('t5-tile');
+            tile.genre = g;
+            return tile;
+        });
+        this.#grid.replaceChildren(document.createElement('t5-masthead'), ...tiles);
+    }
+    #indexOf(id) {
+        return this.#genres.findIndex((g) => g.id === id);
+    }
+    #randomIndex() {
+        const n = this.#genres.length;
+        if (n < 2)
+            return 0;
+        if (this.#active < 0)
+            return Math.floor(Math.random() * n);
+        const pick = Math.floor(Math.random() * (n - 1));
+        return pick >= this.#active ? pick + 1 : pick;
+    }
+    #tileAt(i) {
+        return this.#grid.querySelectorAll('t5-tile')[i] ?? null;
+    }
+    #open(i, origin, fromTile = true) {
+        const genre = this.#genres[i];
+        if (!genre)
+            return;
+        if (!this.#sheet.isOpen)
+            this.#returnFocus = fromTile ? this.#tileAt(i) : null;
+        this.#active = i;
+        const n = this.#genres.length;
+        const prev = this.#genres[(i - 1 + n) % n];
+        const next = this.#genres[(i + 1) % n];
+        this.#sheet.show(genre, { index: i, total: n, prev, next }, origin);
+    }
+    #step(dir) {
+        const n = this.#genres.length;
+        const i = (this.#active + dir + n) % n;
+        this.#returnFocus = this.#tileAt(i);
+        this.#open(i, { x: dir > 0 ? window.innerWidth : 0, y: window.innerHeight / 2 });
+    }
+}
+customElements.define('t5-board', T5Board);
+
+// ---- main.ts
+const board = document.querySelector('t5-board');
+if (board)
+    board.genres = GENRES;
+
+</script>
