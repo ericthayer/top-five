@@ -1,0 +1,96 @@
+/* Layout: a full-bleed riso-printed bento board. Each genre is an ink plate with its own silhouette
+   and a motif from its world; the masthead is bare type on paper. Breakpoints follow the board's
+   container width, not the viewport. */
+:root {
+  --paper: #EFF1EC;
+  --ink: #1C1B26;
+  --on-dark: #F7F6F0;
+  --on-light: #1C1B26;
+  --riso-blue: #3D5588;
+  --riso-orange: #FF6C2F;
+  --riso-purple: #765BA7;
+  --riso-yellow: #FFE800;
+  --riso-pink: #FF48B0;
+  --riso-teal: #00787E;
+  --riso-green: #00A95C;
+  --riso-red: #F15060;
+  --font-display: "Bagel Fat One", "Arial Black", system-ui, sans-serif;
+  --font-body: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Martian Mono", ui-monospace, Menlo, monospace;
+  --gap: clamp(8px, 1vw, 14px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --paper: #15141B; --ink: #EDEBF3; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --paper: #15141B; --ink: #EDEBF3; color-scheme: dark; }
+
+html, body { height: 100%; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--font-body);
+  padding-inline: 16px; padding-block: 16px; box-sizing: border-box;
+}
+
+t5-board { display: block; container: board / inline-size; block-size: 100%; }
+
+.board-grid {
+  display: grid; gap: var(--gap); block-size: 100%; min-block-size: 600px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+  grid-template-areas:
+    "mast mast mast mast soul soul soul soul soul taco taco taco"
+    "mast mast mast mast soul soul soul soul soul taco taco taco"
+    "mast mast mast mast scif scif hiph hiph hiph taco taco taco"
+    "type type type type scif scif hiph hiph hiph taco taco taco"
+    "type type type type road road road road snkr snkr game game"
+    "type type type type road road road road snkr snkr game game";
+}
+
+t5-masthead { grid-area: mast; }
+t5-tile[area="soul"] { grid-area: soul; --order: 1; }
+t5-tile[area="taco"] { grid-area: taco; --order: 2; }
+t5-tile[area="scif"] { grid-area: scif; --order: 3; }
+t5-tile[area="hiph"] { grid-area: hiph; --order: 4; }
+t5-tile[area="type"] { grid-area: type; --order: 5; }
+t5-tile[area="road"] { grid-area: road; --order: 6; }
+t5-tile[area="snkr"] { grid-area: snkr; --order: 7; }
+t5-tile[area="game"] { grid-area: game; --order: 8; }
+
+@container board (max-width: 959px) {
+  .board-grid {
+    block-size: auto; min-block-size: 0;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-rows: none; grid-auto-rows: 176px;
+    grid-template-areas:
+      "mast mast mast soul soul soul"
+      "mast mast mast soul soul soul"
+      "taco taco scif scif hiph hiph"
+      "taco taco type type type type"
+      "road road road road snkr snkr"
+      "game game game game snkr snkr";
+  }
+}
+
+@container board (max-width: 599px) {
+  .board-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 168px;
+    grid-template-areas:
+      "mast mast"
+      "mast mast"
+      "soul soul"
+      "taco scif"
+      "taco hiph"
+      "type type"
+      "road road"
+      "snkr game";
+  }
+}
+
+/* Fallback for engines without container queries. */
+@supports not (container-type: inline-size) {
+  @media (max-width: 991px) {
+    .board-grid { block-size: auto; grid-template-columns: 1fr 1fr; grid-template-rows: none;
+      grid-auto-rows: 176px; grid-template-areas: "mast mast" "mast mast" "soul soul" "taco scif"
+      "taco hiph" "type type" "road road" "snkr game"; }
+  }
+}
